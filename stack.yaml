@@ -1,0 +1,98 @@
+version: '3'
+
+services:
+  authenticationDB:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    networks:
+      - net_auth
+    volumes:
+      - db_auth:/var/lib/mysql
+  authenticationDBMigration:
+    image: authenticationdbmigration
+    environment:
+      - AUTH_DATABASE_URL=authenticationDB
+    networks:
+        - net_auth
+  authentication:
+    image: authentication
+    environment:
+      - AUTH_DATABASE_URL=authenticationDB
+    ports:
+      - 5002:5002
+    networks:
+      - net_auth
+
+
+  votingDB:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    networks:
+      - net_admin
+      - net_daemon
+    volumes:
+      - db_election:/var/lib/mysql
+
+  votingDBMigration:
+    image: applicationsdbmigration
+    environment:
+      - VOTING_DATABASE_URL=votingDB
+    networks:
+      - net_admin
+  admin:
+    image: admin
+    environment:
+      - VOTING_DATABASE_URL=votingDB
+    ports:
+    - 5003:5002
+    networks:
+      - net_admin
+
+  redis:
+    image: redis
+    networks:
+      - net_voting
+      - net_daemon
+
+  daemon:
+    image: daemon
+    environment:
+      - VOTING_DATABASE_URL=votingDB
+      - REDIS_URL=redis
+    networks:
+      - net_daemon
+
+  voting:
+    image: user
+    environment:
+      - REDIS_URL=redis
+    networks:
+      - net_voting
+    ports:
+    - 5004:5002
+    deploy:
+      replicas: 3
+
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
+    networks:
+      - net_admin
+      - net_daemon
+
+networks:
+  net_admin:
+    driver: overlay
+  net_daemon:
+    driver: overlay
+  net_voting:
+    driver: overlay
+  net_auth:
+    driver: overlay
+
+volumes:
+  db_auth:
+  db_election:

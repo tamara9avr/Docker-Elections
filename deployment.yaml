@@ -1,0 +1,116 @@
+version: '3'
+
+services:
+  authenticationDB:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 10
+    networks:
+      - net_auth
+    ports:
+      - 3307:3306
+
+  authenticationDBMigration:
+    image: authenticationdbmigration
+    environment:
+      - AUTH_DATABASE_URL=authenticationDB
+    depends_on:
+      authenticationDB:
+        condition: service_healthy
+    networks:
+      - net_auth
+
+  authentication:
+    image: authentication
+    environment:
+      - AUTH_DATABASE_URL=authenticationDB
+    ports:
+    - 5002:5002
+    depends_on:
+      - authenticationDBMigration
+    networks:
+      - net_auth
+
+
+  votingDB:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 10
+    ports:
+      - 3306:3306
+    networks:
+      - net_admin
+      - net_daemon
+
+  votingDBMigration:
+    image: applicationsdbmigration
+    environment:
+      - VOTING_DATABASE_URL=votingDB
+    depends_on:
+      votingDB:
+        condition: service_healthy
+    networks:
+      - net_admin
+  admin:
+    image: admin
+    environment:
+      - VOTING_DATABASE_URL=votingDB
+    depends_on:
+      - votingDBMigration
+    ports:
+    - 5003:5002
+    networks:
+      - net_admin
+
+  redis:
+    image: redis
+    networks:
+      - net_voting
+      - net_daemon
+
+  daemon:
+    image: daemon
+    environment:
+      - VOTING_DATABASE_URL=votingDB
+      - REDIS_URL=redis
+    depends_on:
+      - redis
+    networks:
+      - net_daemon
+
+  voting:
+    image: user
+    environment:
+      - REDIS_URL=redis
+    depends_on:
+      - redis
+    networks:
+      - net_voting
+    ports:
+    - 5004:5002
+
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
+    networks:
+      - net_admin
+      - net_daemon
+
+networks:
+  net_admin:
+  net_daemon:
+  net_voting:
+  net_auth:
+
+volumes:
+  db_auth:
+  db_election:
